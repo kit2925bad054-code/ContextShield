@@ -26,7 +26,7 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     input_type: str
     content: str = ""
-    mode: str = "rule"
+    mode: str = "ai"
 
 @app.get("/api/health")
 def health():
