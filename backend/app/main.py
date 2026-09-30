@@ -10,9 +10,14 @@ from .engines.ai_engine import analyze_with_ai
 
 app = FastAPI(title="ContextShield API", version="2.0.0")
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173","https://contextshield-j58d.vercel.app"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://contextshield-j58d.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
