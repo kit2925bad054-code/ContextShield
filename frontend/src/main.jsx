@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import "./index.css";
 
-const API = "http://localhost:8000/api/analyze";
+const API = `${import.meta.env.VITE_API_URL}/api/analyze`;
 const HISTORY_KEY = "contextshield_history";
 
 const inputs = [
