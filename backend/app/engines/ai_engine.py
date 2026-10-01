@@ -1,5 +1,6 @@
 import os
 import json
+import time
 
 
 def analyze_with_ai(text, input_type="message", rule_result=None):
@@ -50,10 +51,37 @@ INPUT:
 {text}
 """
 
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt
-        )
+        # Retry transient Gemini failures
+        response = None
+
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
+                break
+
+            except Exception as e:
+                error_text = str(e)
+
+                if "503" not in error_text and "UNAVAILABLE" not in error_text:
+                    raise
+
+                print(
+                    f"⚠️ Gemini temporarily unavailable. "
+                    f"Retry {attempt + 1}/3"
+                )
+
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+
+        if response is None:
+            return {
+                "enabled": False,
+                "message": "Gemini temporarily unavailable after retries.",
+                "fallback": rule_result
+            }
 
         raw = response.text.strip()
 
