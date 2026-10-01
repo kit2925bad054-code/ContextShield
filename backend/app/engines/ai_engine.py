@@ -2,8 +2,15 @@ import os
 import json
 import time
 
+from fastapi import UploadFile
 
-def analyze_with_ai(text, input_type="message", rule_result=None):
+
+async def analyze_with_ai(
+    text,
+    input_type="message",
+    rule_result=None,
+    image: UploadFile | None = None
+):
 
     api_key = os.getenv("GEMINI_API_KEY")
 
@@ -16,6 +23,7 @@ def analyze_with_ai(text, input_type="message", rule_result=None):
 
     try:
         from google import genai
+        from google.genai import types
 
         client = genai.Client(api_key=api_key)
 
@@ -27,7 +35,27 @@ def analyze_with_ai(text, input_type="message", rule_result=None):
         prompt = f"""
 You are ContextShield, an explainable scam detection system.
 
-Analyze the following {input_type} for scam or fraud indicators.
+Analyze the provided {input_type} for scam, fraud, phishing,
+impersonation, or social-engineering indicators.
+
+For screenshots, analyze BOTH:
+1. The actual visual content of the image.
+2. The OCR/extracted text provided below.
+
+Pay attention to:
+- Sender identity and email/domain
+- URLs and domains
+- Requests for money or sensitive information
+- OTP, PIN, password, bank or card requests
+- Urgency and threats
+- Fake rewards, jobs, internships, prizes or offers
+- Impersonation of companies or organizations
+- Suspicious buttons, links, branding or visual elements
+- Contradictions between branding and the actual sender/domain
+- Context of the complete message
+
+Do NOT mark something as a scam merely because it contains urgency.
+Use the complete evidence.
 
 Return ONLY valid JSON:
 
@@ -46,26 +74,52 @@ Rules:
 - Explain only observable evidence.
 - Do not invent facts.
 - Give practical safety advice.
+- If strong scam indicators are visible, reflect them in the risk score.
 
-INPUT:
+OCR TEXT:
 {text}
 """
 
-        # Retry transient Gemini failures
+        contents = []
+
+        # Add the actual screenshot to Gemini
+        if image is not None:
+            image_bytes = await image.read()
+
+            print("🔥 IMAGE RECEIVED:", len(image_bytes), "bytes")
+            print("🔥 IMAGE TYPE:", image.content_type)
+
+            contents.append(
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=image.content_type or "image/png"
+                )
+            )
+
+        contents.append(prompt)
+
         response = None
 
+        # Retry temporary Gemini 503 errors
         for attempt in range(3):
+
             try:
+
                 response = client.models.generate_content(
                     model=model,
-                    contents=prompt
+                    contents=contents
                 )
+
                 break
 
             except Exception as e:
+
                 error_text = str(e)
 
-                if "503" not in error_text and "UNAVAILABLE" not in error_text:
+                if (
+                    "503" not in error_text
+                    and "UNAVAILABLE" not in error_text
+                ):
                     raise
 
                 print(
@@ -102,10 +156,14 @@ INPUT:
         }
 
     except Exception as e:
+
         print("🔥 AI ERROR:", repr(e))
 
         return {
             "enabled": False,
-            "message": f"AI analysis unavailable: {type(e).__name__}: {e}",
+            "message": (
+                f"AI analysis unavailable: "
+                f"{type(e).__name__}: {e}"
+            ),
             "fallback": rule_result
         }

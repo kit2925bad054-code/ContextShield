@@ -1,15 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from .engines.rule_engine import analyze as analyze_rule
 from .engines.ai_engine import analyze_with_ai
 
 app = FastAPI(title="ContextShield API", version="2.0.0")
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,25 +21,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class AnalyzeRequest(BaseModel):
-    input_type: str
-    content: str = ""
-    mode: str = "ai"
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "ContextShield"}
+    return {
+        "status": "ok",
+        "service": "ContextShield"
+    }
+
 
 @app.post("/api/analyze")
-def run(req: AnalyzeRequest):
+async def run(
+    input_type: str = Form(...),
+    content: str = Form(""),
+    mode: str = Form("ai"),
+    image: UploadFile | None = File(None)
+):
 
-    rule = analyze_rule(req.content, req.input_type)
+    rule = analyze_rule(content, input_type)
 
-    if req.mode == "ai":
-        ai = analyze_with_ai(
-            req.content,
-            req.input_type,
-            rule
+    if mode == "ai":
+
+        ai = await analyze_with_ai(
+            content,
+            input_type,
+            rule,
+            image
         )
 
         if ai.get("result"):
@@ -54,12 +58,13 @@ def run(req: AnalyzeRequest):
             "ai_status": ai.get("message")
         }
 
-    if req.mode == "hybrid":
+    if mode == "hybrid":
 
-        ai = analyze_with_ai(
-            req.content,
-            req.input_type,
-            rule
+        ai = await analyze_with_ai(
+            content,
+            input_type,
+            rule,
+            image
         )
 
         if ai.get("result"):

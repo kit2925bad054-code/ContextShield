@@ -170,16 +170,25 @@ try {
   // =========================
   // SEND REAL CONTENT
   // =========================
-  const response = await fetch(API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      input_type: type,
-      content,
-    }),
-  });
+  const formData = new FormData();
+
+formData.append("input_type", type);
+formData.append("content", content);
+formData.append("mode", "ai");
+
+if (type === "screenshot" && file) {
+  formData.append("image", file);
+}
+
+const response = await fetch(API, {
+  method: "POST",
+  body: formData,
+});
+
+if (!response.ok) {
+  throw new Error("API request failed");
+}
+
 
   if (!response.ok) {
     throw new Error("API request failed");
